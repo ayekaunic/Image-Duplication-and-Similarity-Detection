@@ -1,40 +1,63 @@
 # imports
-from PIL import Image
-import imagehash
 import os
 import pandas as pd
+from PIL import Image
+import imagehash
+from skimage import io, metrics
+from tqdm import tqdm
 
 # functions
 def compute_hash(image_path):
     img = Image.open(image_path).convert('L')
-    hash_value = imagehash.phash(img)
+    hash_value = str(imagehash.average_hash(img))
     return hash_value
 
-def find_duplicate_images(folder_path):
-    hash_dict = {}
+def find_duplicate_images(images_directory):
+    image_files = [f for f in os.listdir(images_directory) if f.endswith(('.jpg', '.jpeg', '.png'))]
+    num_files = len(image_files)
+
+    duplicates_matrix = pd.DataFrame(index=image_files, columns=image_files).fillna('_')
+
+    for i in tqdm(range(num_files), desc="Finding Duplicates"):
+        for j in range(i + 1, num_files):
+            file1 = image_files[i]
+            file2 = image_files[j]
+
+            hash1 = compute_hash(os.path.join(images_directory, file1))
+            hash2 = compute_hash(os.path.join(images_directory, file2))
+
+            if hash1 == hash2:
+                duplicates_matrix.at[file1, file2] = 'Duplicates'
+                duplicates_matrix.at[file2, file1] = 'Duplicates'
+
+    duplicates_matrix.to_csv('duplicates.csv')
     
-    image_paths = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.lower().endswith(('.png', '.jpg', '.jpeg'))]
+def calculate_similarity(image1, image2):
+    if image1.shape != image2.shape:
+        return 0
+    return metrics.structural_similarity(image1, image2, channel_axis=2)
 
-    data = {'File Name': [], 'Is Duplicate': [], 'Duplicate Of': []}
+def find_similar_images(images_directory):
+    image_files = [f for f in os.listdir(images_directory) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
 
-    for path in image_paths:
-        hash_value = compute_hash(path)
+    similarity_matrix = pd.DataFrame(index=image_files, columns=image_files)
 
-        if hash_value in hash_dict:
-            data['File Name'].append(os.path.basename(path))
-            data['Is Duplicate'].append('Yes')
-            data['Duplicate Of'].append(os.path.basename(hash_dict[hash_value]))
-        else:
-            hash_dict[hash_value] = path
+    for file1 in tqdm(image_files, desc="Calculating Similarty"):
+        for file2 in image_files:
+            if file1 == file2:
+                similarity = 0
+            else:
+                image1 = io.imread(os.path.join(images_directory, file1))
+                image2 = io.imread(os.path.join(images_directory, file2))
+                similarity = calculate_similarity(image1, image2)
+                similarity = round(similarity, 3)
 
-            data['File Name'].append(os.path.basename(path))
-            data['Is Duplicate'].append('No')
-            data['Duplicate Of'].append('')
+            similarity_matrix.at[file1, file2] = similarity
 
-    df = pd.DataFrame(data)
-    df.to_csv("report.csv", index=False)
-    print("Report generated.")
+    similarity_matrix.to_csv("similarity.csv", index=True)
     
-# main
+# generating reports
 if __name__ == '__main__':
-    find_duplicate_images("./images/")
+    images_directory = "./images/"
+    find_duplicate_images(images_directory)
+    find_similar_images(images_directory)
