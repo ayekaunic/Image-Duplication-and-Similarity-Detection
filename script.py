@@ -7,7 +7,7 @@ import pandas as pd
 # functions
 def compute_hash(image_path):
     img = Image.open(image_path).convert('L')
-    hash_value = imagehash.average_hash(img)
+    hash_value = imagehash.phash(img)
     return hash_value
 
 def find_duplicate_images(folder_path):
