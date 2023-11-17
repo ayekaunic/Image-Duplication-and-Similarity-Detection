@@ -66,19 +66,18 @@ def find_similar_images(images_directory):
         img_embedding = get_image_embeddings(img)
         image_embeddings[file] = img_embedding
 
-    for file1 in tqdm(image_files, desc="Calculating Similarity"):
-        for file2 in image_files:
-            if file1 == file2:
-                similarity = 0
-            else:
-                img_embedding1 = image_embeddings[file1]
-                img_embedding2 = image_embeddings[file2]
-                similarity = get_similarity_score(img_embedding1, img_embedding2)[0]
-                similarity = round(similarity, 3)
-
+    for i in tqdm(range(len(image_files)), desc="Calculating Similarity"):
+        file1 = image_files[i]
+        for j in range(i + 1, len(image_files)):
+            file2 = image_files[j]
+            img_embedding1 = image_embeddings[file1]
+            img_embedding2 = image_embeddings[file2]
+            similarity = get_similarity_score(img_embedding1, img_embedding2)[0]
+            similarity = round(similarity, 3)
             similarity_matrix.at[file1, file2] = similarity
+            similarity_matrix.at[file2, file1] = similarity
 
-    similarity_matrix.to_csv("similarity.csv", index=True)
+        similarity_matrix.to_csv("similarity.csv", index=True)
 
 # similarity model
 vgg16 = VGG16(weights='imagenet', include_top=False, 
